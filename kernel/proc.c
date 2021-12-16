@@ -654,3 +654,17 @@ procdump(void)
     printf("\n");
   }
 }
+
+
+uint64 
+fetch_nproc()
+{
+  uint64 ret = NPROC;
+  struct proc *p;
+
+  for(p = proc; p < &proc[NPROC]; p++){
+    if(p->state == UNUSED)
+      ret --;
+  }
+  return ret;
+}
