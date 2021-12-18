@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "*.strings": "plist",
+        "syscall.h": "c",
+        "cstdlib": "c"
+    }
+}
