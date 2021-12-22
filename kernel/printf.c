@@ -132,3 +132,18 @@ printfinit(void)
   initlock(&pr.lock, "pr");
   pr.locking = 1;
 }
+
+void 
+backtrace()
+{
+  printf("backtrace\n");
+  uint64 s0 = r_fp();
+  uint64 stacktop = s0;
+  while(PGROUNDUP(stacktop)<=TRAMPOLINE&& PGROUNDDOWN(stacktop)>=PHYSTOP)
+  {
+    uint64 retaddress = *(uint64*)((stacktop) - 8);
+    printf("%p\n", retaddress);
+    stacktop = *(uint64*)((stacktop) - 16);
+  }
+  return ;
+}
