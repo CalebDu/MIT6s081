@@ -81,8 +81,10 @@ usertrap(void)
   {
     yield();
     p->tick_count++;
-    if(p->tick_count == p->ticks)
+    if(p->tick_count == p->ticks&& p->handler_run==0)
     {
+      save();
+      p->handler_run = 1;
       p->tick_count = 0;
       p->trapframe->epc = p->handler;
     }

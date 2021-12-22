@@ -78,6 +78,45 @@ struct trapframe {
   /* 264 */ uint64 t4;
   /* 272 */ uint64 t5;
   /* 280 */ uint64 t6;
+
+  
+  /*   0 */ uint64 _kernel_satp;   // kernel page table
+  /*   8 */ uint64 _kernel_sp;     // top of process's kernel stack
+  /*  16 */ uint64 _kernel_trap;   // usertrap()
+  /*  24 */ uint64 _epc;           // saved user program counter
+  /*  32 */ uint64 _kernel_hartid; // saved kernel tp
+  /*  40 */ uint64 _ra;
+  /*  48 */ uint64 _sp;
+  /*  56 */ uint64 _gp;
+  /*  64 */ uint64 _tp;
+  /*  72 */ uint64 _t0;
+  /*  80 */ uint64 _t1;
+  /*  88 */ uint64 _t2;
+  /*  96 */ uint64 _s0;
+  /* 104 */ uint64 _s1;
+  /* 112 */ uint64 _a0;
+  /* 120 */ uint64 _a1;
+  /* 128 */ uint64 _a2;
+  /* 136 */ uint64 _a3;
+  /* 144 */ uint64 _a4;
+  /* 152 */ uint64 _a5;
+  /* 160 */ uint64 _a6;
+  /* 168 */ uint64 _a7;
+  /* 176 */ uint64 _s2;
+  /* 184 */ uint64 _s3;
+  /* 192 */ uint64 _s4;
+  /* 200 */ uint64 _s5;
+  /* 208 */ uint64 _s6;
+  /* 216 */ uint64 _s7;
+  /* 224 */ uint64 _s8;
+  /* 232 */ uint64 _s9;
+  /* 240 */ uint64 _s10;
+  /* 248 */ uint64 _s11;
+  /* 256 */ uint64 _t3;
+  /* 264 */ uint64 _t4;
+  /* 272 */ uint64 _t5;
+  /* 280 */ uint64 _t6;
+           
 };
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
@@ -86,6 +125,7 @@ enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 struct proc {
   struct spinlock lock;
   uint64 handler;
+  int handler_run;
   int tick_count;
   int ticks;
   // p->lock must be held when using these:
