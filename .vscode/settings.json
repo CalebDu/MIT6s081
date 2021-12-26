@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "*.strings": "plist",
+        "cmath": "c",
+        "*.tcc": "c",
+        "memlayout.h": "c"
+    }
+}

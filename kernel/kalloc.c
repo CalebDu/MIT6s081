@@ -12,22 +12,62 @@
 void freerange(void *pa_start, void *pa_end);
 
 extern char end[]; // first address after kernel.
-                   // defined by kernel.ld.
+                   // defined by kernel.ld. 
 
 struct run {
   struct run *next;
 };
-
+struct {
+  struct spinlock lock;
+  int count[PGROUNDUP(PHYSTOP) / PGSIZE];
+} refc;
 struct {
   struct spinlock lock;
   struct run *freelist;
 } kmem;
+void
+refcinit()
+{
+  initlock(&refc.lock, "refc");
+  for (int i = 0; i < PGROUNDUP(PHYSTOP) / PGSIZE; i++) {
+    refc.count[i] = 0;
+  }
+}
+   
+void
+refcinc(void *pa)
+{
+  acquire(&refc.lock);
+  refc.count[PA2IDX(pa)]++;
+  release(&refc.lock);
+}
+   
+void
+refcdec(void *pa)
+{
+  acquire(&refc.lock);
+  refc.count[PA2IDX(pa)]--;
+  release(&refc.lock);
+}
+   
+int
+getrefc(void *pa)
+{
+  return refc.count[PA2IDX(pa)];
+}
+   
 
 void
 kinit()
 {
+  refcinit();
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)PHYSTOP);
+  char *p;
+  p = (char*)PGROUNDUP((uint64)end);
+  for(; p + PGSIZE <= (char*)PHYSTOP; p += PGSIZE) {
+    refcinc((void*)p);
+  }
 }
 
 void
@@ -36,9 +76,10 @@ freerange(void *pa_start, void *pa_end)
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
   for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  {
     kfree(p);
+  }
 }
-
 // Free the page of physical memory pointed at by v,
 // which normally should have been returned by a
 // call to kalloc().  (The exception is when
@@ -47,10 +88,11 @@ void
 kfree(void *pa)
 {
   struct run *r;
-
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
-
+  
+  refcdec(pa);
+  if (getrefc(pa) > 0) return;
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
 
@@ -75,8 +117,42 @@ kalloc(void)
   if(r)
     kmem.freelist = r->next;
   release(&kmem.lock);
-
   if(r)
-    memset((char*)r, 5, PGSIZE); // fill with junk
+  {
+      memset((char*)r, 5, PGSIZE); // fill with junk
+      refcinc((void*)r);
+  }
+  
   return (void*)r;
+}
+
+uint64
+cow_alloc(pagetable_t pg, uint64 va)
+{
+  uint64 pa;
+  pte_t *pte;
+  uint flags;
+  if(va>=MAXVA)
+    return -1;
+  va = PGROUNDDOWN(va);
+  pte = walk(pg, va, 0);
+  if(pte == 0)
+    return -1;
+  if((*pte&PTE_V)==0)
+    return -1;
+  pa = PTE2PA(*pte);
+  if(pa == 0)
+    return -1;
+  flags = PTE_FLAGS(*pte);
+  if(flags & PTE_COW)
+  {
+    char *mem = kalloc();
+    if(mem==0)
+      return -1;
+    memmove(mem, (char*)pa, PGSIZE);
+    flags = (flags & ~PTE_COW) | PTE_W;
+    *pte = PA2PTE((uint64)mem) | flags;
+    kfree((void*)pa);
+  }
+  return 0;
 }
