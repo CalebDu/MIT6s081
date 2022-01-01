@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "*.strings": "plist",
+        "buf.h": "c"
+    }
+}
