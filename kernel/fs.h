@@ -23,7 +23,7 @@ struct superblock {
 };
 
 #define FSMAGIC 0x10203040
-
+#define SYMDEEPTH 10
 #define NDIRECT 11
 #define NINDIRECT (BSIZE / sizeof(uint))
 #define N_DOUBLE_INDIRECT (BSIZE / sizeof(uint))*(BSIZE / sizeof(uint)) 
