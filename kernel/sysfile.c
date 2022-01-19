@@ -526,6 +526,32 @@ sys_mmap()
 uint64
 sys_munmap()
 {
+  uint64 addr, len;
+  argaddr(0, &addr);
+  argaddr(1, &len);
+  struct proc *p = myproc();
+  struct vmem *vp = 0;
+  for(int i=0; i<16; i++)
+  {
+    if(p->vma[i].used==1&& addr>=p->vma[i].addr&&addr< p->vma[i].addr+p->vma[i].len)
+    {
+      vp = &p->vma[i];
+      vp->used = 0;
+      break;
+    }
+  }
+  if(vp==0)
+    return 0;
+  if(vp->flags & MAP_SHARED)
+  {
+    if(filewrite(vp->f, addr, len) == -1)
+      return -1;
+  }
+  fileclose(vp->f);
+  uint64 pa;
+  if((pa = walkaddr(p->pagetable, addr))==0)
+    return 0;
+  uvmunmap(p->pagetable, PGROUNDDOWN(addr), (len+PGSIZE-1)/PGSIZE,0);
 
   return 0;
 }
