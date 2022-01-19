@@ -5,7 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
-
+#include "fcntl.h"
 struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
@@ -279,9 +279,23 @@ fork(void)
   if((np = allocproc()) == 0){
     return -1;
   }
-
+  uint64 mmap_size = 0;
+  for(int i=0; i<16; i++)
+  {
+    if(p->vma[i].used)
+    {
+      np->vma[i].addr = p->vma[i].addr;
+      np->vma[i].used = p->vma[i].used;
+      np->vma[i].f = p->vma[i].f;
+      np->vma[i].flags = p->vma[i].flags;
+      np->vma[i].perm = p->vma[i].perm;
+      np->vma[i].len = p->vma[i].len;
+      mmap_size += p->vma[i].len;
+      filedup(p->vma[i].f);
+    }
+  }
   // Copy user memory from parent to child.
-  if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
+  if(uvmcopy(p->pagetable, np->pagetable, p->sz-mmap_size) < 0){
     freeproc(np);
     release(&np->lock);
     return -1;
@@ -342,16 +356,21 @@ exit(int status)
 
   if(p == initproc)
     panic("init exiting");
-
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
     if(p->ofile[fd]){
       struct file *f = p->ofile[fd];
       fileclose(f);
       p->ofile[fd] = 0;
+    };
+  }
+  struct vmem *pvma = p->vma;
+  for (int i = 0; i < 16; i++) {
+    if (pvma[i].used == 1) {
+      uvmunmap(p->pagetable, pvma[i].addr, pvma[i].len / PGSIZE, 0);
+      memset(&pvma[i], 0, sizeof(struct vmem));
     }
   }
-
   begin_op();
   iput(p->cwd);
   end_op();

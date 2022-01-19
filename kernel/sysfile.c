@@ -517,6 +517,7 @@ sys_mmap()
       p->vma[i].flags = flags;
       p->vma[i].f = f;
       p->sz += len;
+      p->vma[i].off = 0;
       return p->vma[i].addr;
     }
   }
@@ -533,7 +534,7 @@ sys_munmap()
   struct vmem *vp = 0;
   for(int i=0; i<16; i++)
   {
-    if(p->vma[i].used==1&& addr>=p->vma[i].addr&&addr< p->vma[i].addr+p->vma[i].len)
+    if(p->vma[i].used==1&& addr>=p->vma[i].addr+ p->vma[i].off&&addr< p->vma[i].off+p->vma[i].addr+p->vma[i].len)
     {
       vp = &p->vma[i];
       vp->used = 0;
@@ -544,9 +545,10 @@ sys_munmap()
     return 0;
   if(vp->flags & MAP_SHARED)
   {
-    if(filewrite(vp->f, addr, len) == -1)
+    if(mmap_write_back(vp->f, addr, len) == -1)
       return -1;
   }
+  vp->len -= len;
   fileclose(vp->f);
   uint64 pa;
   if((pa = walkaddr(p->pagetable, addr))==0)

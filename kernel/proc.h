@@ -88,6 +88,7 @@ struct vmem{
   int len;
   int perm;
   int flags;
+  int off;
 };
 // Per-process state
 struct proc {
