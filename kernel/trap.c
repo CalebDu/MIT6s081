@@ -5,6 +5,9 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "sleeplock.h"
+#include "fs.h"
+#include "file.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -16,6 +19,7 @@ void kernelvec();
 
 extern int devintr();
 
+uint64 mmap_alloc(struct proc *p, uint64 va);
 void
 trapinit(void)
 {
@@ -67,7 +71,37 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
+  }
+  else if((r_scause()==13|| r_scause()==15)){    
+    uint64 va = r_stval();
+    if (va >= MAXVA || (va <= PGROUNDDOWN(p->trapframe->sp) && va >= PGROUNDDOWN(p->trapframe->sp) - PGSIZE)) 
+      p->killed = 1;
+    
+    else if(mmap_alloc(p, va)!=0)
+      p->killed = 1;
+    // uint64 pa;
+    // pa = walkaddr(p->pagetable, va);
+    // struct vmem *vp = (struct vmem*)pa;
+    // struct inode *ip = vp->f->ip;
+    // pa = (uint64)kalloc();
+    // ilock(ip);
+    // if(readi(ip, 0, pa, 0, PGSIZE)!=PGSIZE)
+    // {
+    //   iunlock(ip);
+    //   p->killed = 1;
+    // }
+    // iunlock(ip);
+    // uvmunmap(p->pagetable, va, PGROUNDUP(sizeof(struct vmem))/PGSIZE, 0);
+
+    // if(mappages(p->pagetable, va, PGSIZE, pa, PTE_U|PTE_V|vp->perm)==-1)
+    // {
+    //   panic("mmap: mappages");
+    // }
+    
+
+
+  } 
+  else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
@@ -218,3 +252,31 @@ devintr()
   }
 }
 
+uint64 
+mmap_alloc(struct proc *p, uint64 va)
+{
+  struct vmem *vp = 0;
+  for(int i=0; i<16; i++)
+  {
+    if(p->vma[i].used==1&& va>=p->vma[i].addr&& va<p->vma[i].addr + p->vma[i].len)
+    {
+      vp = &(p->vma[i]);
+      break;
+    }
+  }
+  if(vp == 0)
+    return -1;
+  
+  char* mem = kalloc();
+  memset(mem, 0, PGSIZE);
+  struct inode* ip = vp->f->ip;
+  if(mappages(p->pagetable, va, PGSIZE, (uint64)mem,(vp->perm<<1)|PTE_V|PTE_U)!=0)
+  {
+    return -1;
+  } 
+  ilock(ip);
+  readi(ip, 1, va, va-vp->addr, PGSIZE);
+
+  iunlock(ip);
+  return 0; 
+}
